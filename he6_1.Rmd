@@ -1,0 +1,237 @@
+---
+title: "Hw6_1"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r readdata}
+crime <- read.csv('uscrime.txt', sep = '\t')
+head(crime)
+```
+
+```{r str}
+
+# Build a linear regression model with Crime as the response and all other features as predictors
+linear.model <- lm(Crime~.,data=crime)
+
+# Summary of the linear model
+summary(linear.model)
+```
+
+```{r pca}
+# Preparing for PCA
+df.pca<- crime[,-c(16)]
+
+# Perform PCA
+pca.model.1<-prcomp(df.pca,scale. = T)
+pca.model.2<-prcomp(df.pca,scale. = T,rank=7)
+```
+
+```{r screeplot}
+#install.packages("factoextra")
+#library(ggplot2)
+# 'factoextra' package for visualization
+library(factoextra)
+#fviz_eig(pca.model.1)
+```
+#from the scree plot, it can be observed that after seventh dimension, there is no much inmprovement in the % of variance of explained by remaining variables.
+```{r plot1}
+fviz_pca_ind(pca.model.1,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("blue", "orange", "green"),
+             repel = TRUE     # Avoid text overlapping
+)
+```
+
+# variable correlation plot - It shows the relationships between all variables.
+```{r plot21}
+fviz_pca_var(pca.model.1,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("blue", "orange", "green"),
+             repel = TRUE     # Avoid text overlapping
+)
+```
+
+```{r plot2}
+fviz_pca_biplot(pca.model.1, repel = TRUE,
+                col.var = "#2E9FDF", # Variables color
+                col.ind = "red"  # Individuals color
+)
+```
+#A biplot that will allow us to visualize how the samples relate to one another in  PCA (which samples are similar and which are different) and will simultaneously reveal how each variable contributes to each principal component.
+```{r plot4}
+fviz_eig(pca.model.2, addlabels = T)
+```
+```{r plot5}
+fviz_pca_ind(pca.model.2,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("blue", "orange", "green"),
+             repel = TRUE     # Avoid text overlapping
+)
+```
+#get_pca_ind() provides a list of matrices containing all the results for the individuals (coordinates, correlation between individuals and axes, squared cosine and contributions)
+
+```{r plot6}
+fviz_pca_var(pca.model.2,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("blue", "orange", "green"),
+             repel = TRUE     # Avoid text overlapping,
+             
+)
+```
+
+```{r plot7}
+
+fviz_pca_biplot(pca.model.2, repel = TRUE,
+                col.var = "#2E9FDF", # Variables color
+                col.ind = "red"  # Individuals color
+)
+```
+
+```{r eigens}
+# Access to the model components
+eig.val <- get_eigenvalue(pca.model.1)
+eig.val
+```
+
+```{r compute}
+#compute standard deviation of each principal component
+std_dev <- pca.model.1$sdev
+
+#compute variance
+pr_var <- std_dev^2
+
+#check variance of first 7 components
+pr_var[1:7]
+
+#proportion of variance explained
+prop_varex <- pr_var/sum(pr_var)
+prop_varex
+
+
+#cumulative scree plot
+plot(cumsum(prop_varex), 
+     xlab = "Principal Component",
+       ylab = "Cumulative Proportion of Variance Explained",
+       type = "b")
+```
+
+```{r var}
+# Results for Variables
+res.var <- get_pca_var(pca.model.1)
+res.var$coord          # Coordinates for the individuals
+res.var$contrib        # Contributions to the PCs
+res.var$cos2           # Quality of representation 
+```
+
+```{r ind}
+# Results for individuals
+res.ind <- get_pca_ind(pca.model.1)
+res.ind$coord          # Coordinates
+res.ind$contrib        # Contributions to the PCs
+res.ind$cos2           # Quality of representation
+```
+
+```{r p}
+pca.df<-as.data.frame(cbind(pca.model.1$x[,1:7],crime$Crime))
+colnames(pca.df)[8]="Crime"
+head(pca.df)
+```
+
+```{r model}
+
+# Build a linear model with PCA
+lm.pca<-lm(Crime~.,data=pca.df)
+```
+
+```{r plot8}
+# Quality plots
+par(mfrow=c(2,2),pch=19)
+plot(linear.model)
+plot(lm.pca)
+```
+
+```{r predicot}
+
+# Construct a numeric vector with the predictor variables needed
+pred.vector<-c(14.0, 0, 10.0, 12.0, 15.5, 0.640, 94.0, 150, 1.1, 0.120, 3.6, 3200, 20.1, 0.04, 39.0, 0)
+
+# Create a new dataframe by binding the prediction vector to the training data frame
+df1<-rbind(crime,pred.vector)
+
+predict(linear.model,df1[48,1:15])
+```
+```{r predictpca}
+
+# Predictions using pca lm
+
+# Transform the new city vector using predict method of the PCA object
+
+new.city.pc<-predict(pca.model.1,df1[48,1:15])
+new.city.pc
+# Then predict the crime rate using this transformed (un-scaled) vector and linear model built with PCA
+predict(lm.pca,as.data.frame(new.city.pc))
+```
+```{r pcacoef}
+# PCA Linear Model coefficients
+a<-lm.pca$coefficients
+a
+# Only predictors
+a1<-as.matrix(a[2:8])
+a1
+```
+
+```{r rota}
+# PCA model rotation components
+b<-as.matrix(pca.model.1$rotation)
+b
+# Only first 7 components
+b1<- b[,1:7]
+b1
+```
+
+```{r mul}
+
+# Multiply a1 and b1 to get PCA linear model coefficients in terms of original variables
+coeff.orig.var<-b1%*%a1
+coeff.orig.var
+
+```
+
+```{r unsclae}
+# Un-scale by multiplying with scale and adding center
+coeff.orig.var<-coeff.orig.var*pca.model.1$scale+pca.model.1$center
+coeff.orig.var
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
